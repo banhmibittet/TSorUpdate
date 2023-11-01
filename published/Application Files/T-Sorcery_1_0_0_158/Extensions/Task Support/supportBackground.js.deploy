@@ -1,0 +1,82 @@
+let eventDelayMin = 50;
+let eventDelayMax = 200;
+let moveEventDelayMin = 10;
+let moveEventDelayMax = 20;
+let wheelEventDelayMin = 200;
+let wheelEventDelayMax = 300;
+let postDelayMin = 1000;
+let postDelayMax = 2000;
+
+let scrollDownDistanceMin = 500;
+let scrollDownDistanceMax = 1500;
+let scrollUpDistanceMax = -1500;
+let scrollUpDistanceMin = -500;
+
+let actions = {
+    getCurrentUrl: 'getCurrentUrl',
+    sendLog: 'sendLog',
+    quickScanElement: 'quickScanElement',
+    quickScanElementByText: 'quickScanElementByText',
+    getHrefElements: 'getHrefElements',
+    getElementPositionOnScreen: 'getElementPositionOnScreen',
+    getElementPositionOnScreenByText: 'getElementPositionOnScreenByText',
+    getRandomVisibleElementPositionOnScreen: 'getRandomVisibleElementPositionOnScreen',
+    getPositionOnScreen: 'getPositionOnScreen',
+    findElement: 'findElement',
+    findElementByText: 'findElementByText',
+    findElements: 'findElements',
+    findElementsByText: 'findElementsByText',
+    navigate: 'navigate',
+    isElementVisible: 'isElementVisible',
+    isElementVisibleByText: 'isElementVisibleByText',
+    getDistanceToElement: 'getDistanceToElement',
+    getDistanceToRandomElement: 'getDistanceToRandomElement',
+    getDistanceToElementByText: 'getDistanceToElementByText',
+    getDistanceToBottom: 'getDistanceToBottom'
+};
+
+async function executeWithRetry(fn, functionName, delayMs = 10000) {
+    while (true) {
+        try {
+            let result = await fn();
+            return result;
+        } catch (error) {
+            console.error(`${functionName} Error: ${error}`);
+        }
+        await delay(delayMs);
+    }
+}
+
+
+async function delay(ms) {
+    let start = Date.now();
+    let elapsed = 0;
+    while (elapsed < ms) {
+        elapsed = Date.now() - start;
+        // You can use this loop for any other necessary tasks while waiting
+        console.log('delaying');
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+}
+
+function random(min, max) {
+    return Math.random() * (max - min) + min;
+}
+
+function randomRoll() {
+    // Generate a random number between 0 and 99
+    return Math.floor(Math.random() * 100);
+}
+
+function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+}
+
+function randomPickInArray(value) {
+    return value[Math.floor(Math.random() * value.length)];
+}
+
+function removeDiacritics(text) {
+    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
