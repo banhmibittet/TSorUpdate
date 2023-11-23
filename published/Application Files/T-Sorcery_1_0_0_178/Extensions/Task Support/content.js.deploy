@@ -1,0 +1,365 @@
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    switch (request.action) {
+        case actions.getCurrentUrl:
+            getCurrentUrl(sendResponse);
+            break;
+        case actions.isElementVisible:
+            isElementVisible(sendResponse, request.selector, request.containerSelector);
+            break;
+        case actions.isElementVisibleByText:
+            isElementVisibleByText(sendResponse, request.selector, request.textToFind, request.containerSelector);
+            break;
+        case actions.getDistanceToRandomElement:
+            getDistanceToRandomElement(sendResponse, request.selector);
+            break;
+        case actions.getDistanceToElement:
+            getDistanceToElement(sendResponse, request.selector, request.containerSelector);
+            break;
+        case actions.getDistanceToElementByText:
+            getDistanceToElementByText(sendResponse, request.selector, request.textToFind, request.containerSelector);
+            break;
+        case actions.getDistanceToBottom:
+            getDistanceToBottom(sendResponse);
+            break;
+        case actions.sendLog:
+            sendLog(sendResponse, request.log);
+            break;
+        case actions.getHrefElements:
+            getHrefElements(sendResponse, request.selector);
+            break;
+        case actions.quickScanElement:
+            quickScanElement(sendResponse, request.selector);
+            break;
+        case actions.quickScanElementByText:
+            quickScanElementByText(sendResponse, request.selector, request.textToFind);
+            break;
+        case actions.getElementPositionOnScreen:
+            getElementPositionOnScreen(sendResponse, request.selector, request.maxWaitTime);
+            break;
+        case actions.getElementPositionOnScreenByText:
+            getElementPositionOnScreenByText(sendResponse, request.selector, request.textToFind, request.maxWaitTime);
+            break;
+        case actions.getRandomVisibleElementPositionOnScreen:
+            getRandomVisibleElementPositionOnScreen(sendResponse, request.selector, request.maxWaitTime);
+            break;
+        case actions.getPositionOnScreen:
+            getPositionOnScreen(sendResponse);
+            break;
+        case actions.findElement:
+            findElement(sendResponse, request.selector, request.maxWaitTime);
+            break;
+        case actions.findElementByText:
+            findElementByText(sendResponse, request.selector, request.textToFind, request.maxWaitTime);
+            break;
+        case actions.findElements:
+            findElements(sendResponse, request.selector, request.maxWaitTime);
+            break;
+        case actions.findElementsByText:
+            findElementsByText(sendResponse, request.selector, request.textToFind, request.maxWaitTime);
+            break;
+        case actions.navigate:
+            navigate(sendResponse, request.url);
+            break;
+        default:
+        // Code to execute if variable doesn't match any case
+    }
+    return true;
+});
+
+async function isElementVisible(sendResponse, selector, containerSelector) {
+    let result;
+    try {
+        let elementToInteract = await simulateFindElement(selector);
+        let specialContainer;
+        if (containerSelector) {
+            specialContainer = await simulateFindElement(containerSelector);
+        }
+        result = simulateIsElementVisibleByElement(elementToInteract, specialContainer);
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function isElementVisibleByText(sendResponse, selector, textToFind, containerSelector) {
+    let result;
+    try {
+        let elementToInteract = await simulateFindElementByText(selector, textToFind);
+        let specialContainer;
+        if (containerSelector) {
+            specialContainer = await simulateFindElement(containerSelector);
+        }
+        result = simulateIsElementVisibleByElement(elementToInteract, specialContainer);
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function getDistanceToRandomElement(sendResponse, selector) {
+    let result;
+    try {
+        let elements = await simulateFindElements(selector);
+        if (elements.length > 0) {
+            let elementToInteract = randomPickInArray(elements);
+            let distance = await simulateGetDistanceToElement(elementToInteract);
+            result = distance;
+            sendResponse({ result });
+        } else {
+            result = false;
+            sendResponse({ result });
+        }
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function getDistanceToElement(sendResponse, selector, containerSelector) {
+    let result;
+    try {
+        let elementToInteract = await simulateFindElement(selector);
+
+        // Find specialContainer if needed
+        let specialContainer;
+        let specialCoordinate;
+        if (containerSelector) {
+            specialContainer = await simulateFindElement(containerSelector);
+
+            specialCoordinate = await simulateGetElementPositionOnScreenByElement(specialContainer);
+        }
+        let distance = await simulateGetDistanceToElement(elementToInteract, specialContainer);
+        result = distance;
+        sendResponse({ result, specialCoordinate });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function getDistanceToElementByText(sendResponse, selector, textToFind, containerSelector) {
+    let result;
+    try {
+        let elementToInteract = await simulateFindElementByText(selector, textToFind);
+
+        // Find specialContainer if needed
+        let specialContainer;
+        let specialCoordinate;
+        if (containerSelector) {
+            specialContainer = await simulateFindElement(containerSelector);
+
+            specialCoordinate = await simulateGetElementPositionOnScreenByElement(specialContainer);
+        }
+        let distance = await simulateGetDistanceToElement(elementToInteract, specialContainer);
+        result = distance;
+        sendResponse({ result, specialCoordinate });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function getDistanceToBottom(sendResponse) {
+    let result;
+    try {
+        
+        result = document.documentElement.scrollHeight;
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function getCurrentUrl(sendResponse) {
+    let result;
+    try {
+        result = window.location.href;
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function sendLog(sendResponse, log) {
+    let result;
+    try {
+        console.log(log);
+        result = true;
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function getHrefElements(sendResponse, selector) {
+    let result;
+    try {
+        let elements = document.querySelectorAll(selector);
+        let hrefs = Array.from(elements).map((element) => element.getAttribute('href'));
+        result = hrefs;
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function quickScanElement(sendResponse, selector) {
+    let result;
+    try {
+        result = document.querySelector(selector);
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function quickScanElementByText(sendResponse, selector, textToFind) {
+    let result;
+    try {
+        let elements = document.querySelectorAll(selector);
+        for (let element of elements) {
+            if (element.offsetParent !== null) {
+                // Element is visible, add it to the results
+                if (element.textContent.includes(textToFind)) {
+                    result = element; // Element exists
+                }
+            }
+        }
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function getElementPositionOnScreen(sendResponse, selector, maxWaitTime) {
+    let result;
+    try {
+        let elementToInteract = await simulateFindElement(selector, maxWaitTime);
+        if (elementToInteract) {
+            result = await simulateGetElementPositionOnScreenByElement(elementToInteract);
+            sendResponse({ result });
+        } else {
+            result = false;
+            sendResponse({ result });
+        }
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function getElementPositionOnScreenByText(sendResponse, selector, textToFind, maxWaitTime) {
+    let result;
+    try {
+        let elementToInteract = await simulateFindElementByText(selector, textToFind, maxWaitTime);
+        if (elementToInteract) {
+            result = await simulateGetElementPositionOnScreenByElement(elementToInteract);
+            sendResponse({ result });
+        } else {
+            result = false;
+            sendResponse({ result });
+        }
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function getRandomVisibleElementPositionOnScreen(sendResponse, selector, maxWaitTime) {
+    let result;
+    try {
+        let elements = await simulateFindElements(selector, maxWaitTime);
+        if (elements.length > 0) {
+            let visibleElements = [];
+            for (let element of elements) {
+                if (simulateIsElementVisibleByElement(element)) {
+                    // Element is visible, add it to the results
+                    visibleElements.push(element);
+                }
+            }
+            let elementToInteract = randomPickInArray(visibleElements);
+            result = await simulateGetElementPositionOnScreenByElement(elementToInteract);
+            sendResponse({ result });
+        } else {
+            result = false;
+            sendResponse({ result });
+        }
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function getPositionOnScreen(sendResponse) {
+    let result;
+    try {
+        result = await simulateGetPositionOnScreen();
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function findElement(sendResponse, selector, maxWaitTime) {
+    let result;
+    try {
+        result = await simulateFindElement(selector, maxWaitTime);
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function findElementByText(sendResponse, selector, textToFind, maxWaitTime) {
+    let result;
+    try {
+        result = await simulateFindElementByText(selector, textToFind, maxWaitTime);
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function findElements(sendResponse, selector, maxWaitTime) {
+    let result;
+    try {
+        result = await simulateFindElements(selector, maxWaitTime);
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function findElementsByText(sendResponse, selector, textToFind, maxWaitTime) {
+    let result;
+    try {
+        result = await simulateFindElementsByText(selector, textToFind, maxWaitTime);
+        sendResponse({ result });
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
+
+async function navigate(sendResponse, url, isHref) {
+    let result;
+    try {
+        simualteNavigate(url, isHref);
+        sendResponse(true);
+    } catch (error) {
+        result = false;
+        sendResponse({ result });
+    }
+}
