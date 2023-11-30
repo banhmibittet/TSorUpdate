@@ -1,0 +1,765 @@
+// background.js
+
+importScripts('profile.js');
+importScripts('supportBackground.js');
+importScripts('action.js');
+//let campaignUrl = `http://ddl.routerproxy.com:3000/campaignList?campaignID=${profile.Extra}`;
+let campaignUrl = 'http://localhost:8080/getCampaign';
+let otpUrl = 'http://localhost:8080/getOtp';
+let clickUrl = 'http://localhost:8080/click';
+let sendUrl = 'http://localhost:8080/send';
+let scrollUrl = 'http://localhost:8080/scroll';
+let triggerDoneUrl = 'http://localhost:8080/triggerDone';
+let setLogUrl = 'http://localhost:8080/setLog';
+const apiKey = 'RingoSecretKeyAPI';
+let errorOccurred = false;
+let onCompleted = false;
+
+let mainTab;
+let subTab;
+
+async function createOffscreen() {
+  await chrome.offscreen.createDocument({
+    url: 'offscreen.html',
+    reasons: ['BLOBS'],
+    justification: 'keep service worker running',
+  }).catch(() => { });
+}
+
+chrome.runtime.onStartup.addListener(createOffscreen);
+self.onmessage = e => { }; // keepAlive
+createOffscreen();
+
+async function onInstalled() {
+
+  await updateActiveTabUrl('https://www.google.com/');
+
+
+  await delay(10000);
+  await initCampaign();
+
+}
+
+// Listen for startup
+chrome.runtime.onInstalled.addListener(onInstalled);
+
+chrome.webNavigation.onErrorOccurred.addListener(function (details) {
+
+  if (details.frameId === 0) {
+    console.log('onErrorOccurred ' + details.error);
+    errorOccurred = true;
+  }
+});
+
+chrome.webNavigation.onCompleted.addListener(function (details) {
+
+  if (details.frameId === 0) {
+    console.log('onCompleted');
+    onCompleted = true;
+  }
+});
+
+async function openTab(url) {
+  // Create a new tab and open the specified URL.
+  const newTab = await chrome.tabs.create({ url: url });
+  return newTab;
+}
+
+async function switchActiveToTab(tab) {
+  await chrome.tabs.update(tab.id, { active: true });
+}
+
+async function getActiveTab() {
+  let queryOptions = { active: true, lastFocusedWindow: true };
+  // `tab` will either be a `tabs.Tab` instance or `undefined`.
+  let [tab] = await chrome.tabs.query(queryOptions);
+  while (!tab) {
+    [tab] = await chrome.tabs.query(queryOptions);
+  }
+  return tab;
+}
+
+async function updateActiveTabUrl(url) {
+  let tab = await getActiveTab();
+  await chrome.tabs.update(tab.id, { url: url });
+  await delay(random(postDelayMin, postDelayMax));
+}
+
+async function reloadActiveTab() {
+  let tab = await getActiveTab();
+  await chrome.tabs.reload(tab.id);
+  await delay(random(postDelayMin, postDelayMax));
+}
+
+async function initCampaign() {
+  console.log('initCampaign');
+
+  let fetchedCampaign = await fetchCampaign();
+  errorOccurred = false;
+  let isViewYoutube = fetchedCampaign.isViewYoutube;
+  let isViewNews = fetchedCampaign.isViewNews;
+  let isViewWeb = fetchedCampaign.isViewWeb;
+  let isLogMail = fetchedCampaign.isLogMail && profile.ID !== '';
+  let isSubTab = fetchedCampaign.isSubTab;
+
+  mainTab = await getActiveTab();
+  if (isSubTab) {
+    subTab = await openTab('https://www.google.com/');
+    await switchActiveToTab(mainTab);
+  }
+
+  let logMailResult = true;
+  if (isLogMail) {
+
+    logMailResult = await logMail();
+  }
+
+  if (logMailResult) {
+
+    if (isLogMail) {
+
+      await checkLanguage();
+    }
+
+    if (isViewNews) {
+
+      await randomAction();
+    }
+
+    if (isViewYoutube) {
+
+      await viewYoutube();
+    }
+
+    if (isViewWeb) {
+
+      await viewWeb();
+    }
+
+    await fetchSetLog("");
+  } else {
+
+    if (isViewWeb) {
+      if (isViewNews) await randomAction();
+      await viewWeb();
+    }
+    await fetchSetLog("Log Fail");
+  }
+
+  await delay(10000);
+
+  await fetchTriggerDone();
+}
+
+async function waitForLoad() {
+
+  if (errorOccurred) {
+    console.log('1st waitForLoad false');
+    errorOccurred = false;
+    onCompleted = false;
+    return false;
+  }
+
+  let tab = await getActiveTab();
+
+  while (tab.status !== 'complete' && !onCompleted) {
+    tab = await getActiveTab();
+
+    console.log(tab.status + " | " + onCompleted);
+    if (errorOccurred) {
+      console.log('2nd waitForLoad false');
+      errorOccurred = false;
+      onCompleted = false;
+      return false;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+
+  onCompleted = false;
+  return true;
+}
+
+async function fetchTriggerDone() {
+  return await executeWithRetry(async () => {
+    console.log('fetchTriggerDone');
+
+    let controller = new AbortController();
+    setTimeout(() => controller.abort(), 30000);
+
+    let response = await fetch(triggerDoneUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ STT: profile.STT }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Status: ${response.status}`);
+    }
+
+    let data = await response.text();
+    console.log(data);
+    return data;
+  }, 'fetchTriggerDone');
+}
+
+async function fetchSetLog(log) {
+  return await executeWithRetry(async () => {
+    console.log('fetchSetLog');
+
+    let controller = new AbortController();
+    setTimeout(() => controller.abort(), 30000);
+
+    let response = await fetch(setLogUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ STT: profile.STT, Log: log }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Status: ${response.status}`);
+    }
+
+    let data = await response.text();
+    console.log(data);
+    return data;
+  }, 'fetchSetLog');
+}
+
+async function fetchClickRandomReal(selector, maxWaitTime = 10000) {
+  return await executeWithRetry(async () => {
+    console.log('fetchClickRandomReal');
+    if (!(await waitForLoad())) {
+      return;
+    }
+    if (await fetchFindElement(selector, maxWaitTime)) {
+      //console.log('found');
+      let elementData = await fetchGetDistanceToRandomElement(selector);
+      //console.log(elementData.distance);
+      await fetchScrollReal(elementData.distance);
+      let coordinate = await fetchGetRandomVisibleElementPositionOnScreen(selector);
+      //console.log(coordinate);
+      while (!coordinate) {
+        await reloadActiveTab();
+        elementData = await fetchGetDistanceToRandomElement(selector);
+        //console.log(elementData.distance);
+        await fetchScrollReal(elementData.distance);
+        coordinate = await fetchGetRandomVisibleElementPositionOnScreen(selector);
+      }
+
+      let controller = new AbortController();
+      setTimeout(() => controller.abort(), 30000);
+
+      let response = await fetch(clickUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ STT: profile.STT, screenX: coordinate.screenX, screenY: coordinate.screenY }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Status: ${response.status}`);
+      }
+
+      let data = await response.text();
+
+      await delay(random(postDelayMin, postDelayMax));
+      return data;
+    }
+    console.log('not found');
+    return false;
+  }, 'fetchClickRandomReal');
+}
+
+
+async function fetchClickReal(selector, maxWaitTime = 10000, containerSelector = null) {
+  return await executeWithRetry(async () => {
+    console.log('fetchClickReal');
+    if (!(await waitForLoad())) {
+      return;
+    }
+    if (await fetchFindElement(selector, maxWaitTime)) {
+      if (!(await fetchIsElementVisible(selector, containerSelector))) {
+        let data = await fetchGetDistanceToElement(selector, containerSelector);
+        await fetchScrollReal(data.distance, data.specialCoordinate);
+      }
+      let coordinate = await fetchGetElementPositionOnScreen(selector);
+
+      let controller = new AbortController();
+      setTimeout(() => controller.abort(), 30000);
+
+      let response = await fetch(clickUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ STT: profile.STT, screenX: coordinate.screenX, screenY: coordinate.screenY }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Status: ${response.status}`);
+      }
+
+      let data = await response.text();
+      await delay(random(postDelayMin, postDelayMax));
+      return data;
+    }
+    return false;
+  }, 'fetchClickReal');
+}
+
+async function fetchClickByTextReal(selector, textToFind, maxWaitTime = 10000, containerSelector = null) {
+  return await executeWithRetry(async () => {
+    console.log('fetchClickByTextReal');
+    if (!(await waitForLoad())) {
+      return;
+    }
+
+    if (await fetchFindElementByText(selector, textToFind, maxWaitTime)) {
+      if (!(await fetchIsElementVisibleByText(selector, textToFind, containerSelector))) {
+        let data = await fetchGetDistanceToElementByText(selector, textToFind, containerSelector);
+        await fetchScrollReal(data.distance, data.specialCoordinate);
+      }
+      let coordinate = await fetchGetElementPositionOnScreenByText(selector, textToFind);
+
+      let controller = new AbortController();
+      setTimeout(() => controller.abort(), 30000);
+
+      let response = await fetch(clickUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ STT: profile.STT, screenX: coordinate.screenX, screenY: coordinate.screenY }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Status: ${response.status}`);
+      }
+
+      let data = await response.text();
+      await delay(random(postDelayMin, postDelayMax));
+      return data;
+    }
+    return false;
+  }, 'fetchClickByTextReal');
+}
+
+async function fetchSendTextReal(selector, textToType, maxWaitTime = 10000) {
+  return await executeWithRetry(async () => {
+    console.log('fetchSendTextReal');
+    if (!(await waitForLoad())) {
+      return;
+    }
+
+    if (await fetchFindElement(selector, maxWaitTime)) {
+      if (!(await fetchIsElementVisible(selector))) {
+        let data = await fetchGetDistanceToElement(selector);
+        await fetchScrollReal(data.distance);
+      }
+      let coordinate = await fetchGetElementPositionOnScreen(selector);
+
+      let normalizedText = removeDiacritics(textToType);
+
+      let controller = new AbortController();
+      setTimeout(() => controller.abort(), 30000);
+
+      let response = await fetch(sendUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ STT: profile.STT, screenX: coordinate.screenX, screenY: coordinate.screenY, textToType: normalizedText }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Status: ${response.status}`);
+      }
+
+      let data = await response.text();
+      await delay(random(postDelayMin, postDelayMax));
+      return data;
+    }
+    return false;
+  }, 'fetchSendTextReal');
+}
+
+async function fetchScrollReal(distance, specialCoordinate = null) {
+  return await executeWithRetry(async () => {
+    console.log('fetchScrollReal');
+    if (!(await waitForLoad())) {
+      return;
+    };
+
+    let coordinate = await fetchGetPositionOnScreen();
+    let screenX = coordinate.screenX
+    let screenY = coordinate.screenY
+    if (specialCoordinate) {
+      screenX = specialCoordinate.screenX
+      screenY = specialCoordinate.screenY
+    }
+
+    let controller = new AbortController();
+    setTimeout(() => controller.abort(), 30000);
+
+    let response = await fetch(scrollUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ STT: profile.STT, screenX: screenX, screenY: screenY, distance: distance }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Status: ${response.status}`);
+    }
+
+    let data = await response.text();
+
+    await delay(random(postDelayMin, postDelayMax));
+    return data;
+  }, 'fetchScrollReal');
+}
+
+async function fetchCampaign() {
+  return await executeWithRetry(async () => {
+    console.log('fetchCampaign');
+
+    let controller = new AbortController();
+    setTimeout(() => controller.abort(), 30000);
+
+    let response = await fetch(campaignUrl, {
+      method: 'GET',
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Status: ${response.status}`);
+    }
+
+    let data = await response.json();
+    console.log('fetchCampaign ' + data);
+    return data;
+  }, 'fetchCampaign');
+}
+
+async function fetchOtp(secret) {
+  return await executeWithRetry(async () => {
+    console.log('fetchOtp');
+    if (!(await waitForLoad())) {
+      return;
+    };
+
+    secret = secret.replace(/\s/g, '');
+
+    let controller = new AbortController();
+    setTimeout(() => controller.abort(), 30000);
+
+    let response = await fetch(otpUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ STT: profile.STT, secret: secret }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Status: ${response.status}`);
+    }
+
+    let data = await response.text();
+    console.log('fetchOtp ' + data);
+    return data;
+  }, 'fetchOtp');
+}
+
+async function fetchGetCurrentUrl() {
+  return await executeWithRetry(async () => {
+    console.log('fetchGetCurrentUrl');
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.getCurrentUrl });
+    console.log('fetchGetCurrentUrl' + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchGetCurrentUrl');
+}
+
+async function fetchSendLog(log) {
+  return await executeWithRetry(async () => {
+    console.log('fetchSendLog');
+    if (!(await waitForLoad())) {
+      return;
+    };
+
+    let tab = await getActiveTab();
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.sendLog, log: log });
+    console.log('fetchSendLog' + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchSendLog');
+}
+
+async function fetchNavigate(url, isHref = false) {
+  return await executeWithRetry(async () => {
+    console.log('fetchNavigate ' + url);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.navigate, url: url, isHref: isHref });
+    await delay(random(postDelayMin, postDelayMax));
+    return response.result;
+  }, 'fetchNavigate');
+}
+
+async function fetchGetHrefElements(selector) {
+  return await executeWithRetry(async () => {
+    console.log('fetchGetHrefElements ' + selector);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.getHrefElements, selector: selector });
+    console.log('fetchGetHrefElements ' + selector + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchGetHrefElements');
+}
+
+async function fetchQuickScanElement(selector) {
+  return await executeWithRetry(async () => {
+    console.log('fetchQuickScanElement ' + selector);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.quickScanElement, selector: selector });
+    console.log('fetchQuickScanElement ' + selector + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchQuickScanElement');
+}
+
+async function fetchQuickScanElementByText(selector, textToFind) {
+  return await executeWithRetry(async () => {
+    console.log('fetchQuickScanElementByText ' + textToFind);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.quickScanElementByText, selector: selector, textToFind: textToFind });
+    console.log('fetchQuickScanElementByText ' + textToFind + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchQuickScanElementByText');
+}
+
+async function fetchGetElementPositionOnScreen(selector, maxWaitTime = 10000) {
+  return await executeWithRetry(async () => {
+    console.log('fetchGetElementPositionOnScreen' + selector);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.getElementPositionOnScreen, selector: selector, maxWaitTime: maxWaitTime });
+    console.log('fetchGetElementPositionOnScreen' + selector + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchGetElementPositionOnScreen');
+}
+
+async function fetchGetElementPositionOnScreenByText(selector, textToFind, maxWaitTime = 10000) {
+  return await executeWithRetry(async () => {
+    console.log('fetchGetElementPositionOnScreenByText ' + textToFind);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.getElementPositionOnScreenByText, selector: selector, textToFind: textToFind, maxWaitTime: maxWaitTime });
+    console.log('fetchGetElementPositionOnScreenByText ' + textToFind + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchGetElementPositionOnScreenByText');
+}
+
+async function fetchGetRandomVisibleElementPositionOnScreen(selector, maxWaitTime = 10000) {
+  return await executeWithRetry(async () => {
+    console.log('fetchGetRandomVisibleElementPositionOnScreen ' + selector);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.getRandomVisibleElementPositionOnScreen, selector: selector, maxWaitTime: maxWaitTime });
+    console.log('fetchGetRandomVisibleElementPositionOnScreen ' + selector + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchGetRandomVisibleElementPositionOnScreen');
+}
+
+async function fetchGetPositionOnScreen() {
+  return await executeWithRetry(async () => {
+    console.log('fetchGetPositionOnScreen');
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.getPositionOnScreen });
+    console.log('fetchGetPositionOnScreen' + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchGetPositionOnScreen');
+}
+
+async function fetchFindElement(selector, maxWaitTime = 10000) {
+  return await executeWithRetry(async () => {
+    console.log('fetchFindElement ' + selector);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.findElement, selector: selector, maxWaitTime: maxWaitTime });
+    console.log('fetchFindElement ' + selector + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchFindElement');
+}
+
+async function fetchFindElementByText(selector, textToFind, maxWaitTime = 10000) {
+  return await executeWithRetry(async () => {
+    console.log('fetchFindElementByText ' + textToFind);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.findElementByText, selector: selector, textToFind: textToFind, maxWaitTime: maxWaitTime });
+    console.log('fetchFindElementByText ' + textToFind + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchFindElementByText');
+}
+
+async function fetchFindElements(selector, maxWaitTime = 10000) {
+  return await executeWithRetry(async () => {
+    console.log('fetchFindElements ' + selector);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.findElements, selector: selector, maxWaitTime: maxWaitTime });
+    console.log('fetchFindElements ' + selector + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchFindElements');
+}
+
+async function fetchFindElementsByText(selector, textToFind, maxWaitTime = 10000) {
+  return await executeWithRetry(async () => {
+    console.log('fetchFindElementsByText ' + textToFind);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.findElementsByText, selector: selector, textToFind: textToFind, maxWaitTime: maxWaitTime });
+    console.log('fetchFindElementsByText ' + textToFind + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchFindElementsByText');
+}
+
+async function fetchIsElementVisible(selector, containerSelector = null) {
+  return await executeWithRetry(async () => {
+    console.log('fetchIsElementVisible ' + selector);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.isElementVisible, selector: selector, containerSelector: containerSelector });
+    console.log('fetchIsElementVisible ' + selector + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchIsElementVisible');
+}
+
+async function fetchIsElementVisibleByText(selector, textToFind, containerSelector = null) {
+  return await executeWithRetry(async () => {
+    console.log('fetchIsElementVisibleByText ' + textToFind);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.isElementVisibleByText, selector: selector, textToFind: textToFind, containerSelector: containerSelector });
+    console.log('fetchIsElementVisibleByText ' + textToFind + ' result: ' + response.result);
+    return response.result;
+  }, 'fetchIsElementVisibleByText');
+}
+
+async function fetchGetDistanceToRandomElement(selector) {
+  return await executeWithRetry(async () => {
+    console.log('fetchGetDistanceToRandomElement ' + selector);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.getDistanceToRandomElement, selector: selector });
+    console.log('fetchGetDistanceToRandomElement ' + selector + ' result: ' + response.result);
+    return { distance: response.result };
+  }, 'fetchGetDistanceToRandomElement');
+}
+
+async function fetchGetDistanceToElement(selector, containerSelector = null) {
+  return await executeWithRetry(async () => {
+    console.log('fetchGetDistanceToElement ' + selector);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.getDistanceToElement, selector: selector, containerSelector: containerSelector });
+    console.log('fetchGetDistanceToElement ' + selector + ' result: ' + response.result);
+    return { distance: response.result, specialCoordinate: response.specialCoordinate };
+  }, 'fetchGetDistanceToElement');
+}
+
+async function fetchGetDistanceToElementByText(selector, textToFind, containerSelector = null) {
+  return await executeWithRetry(async () => {
+    console.log('fetchGetDistanceToElementByText ' + textToFind);
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.getDistanceToElementByText, selector: selector, textToFind: textToFind, containerSelector: containerSelector });
+    console.log('fetchGetDistanceToElementByText ' + textToFind + ' result: ' + response.result);
+    return { distance: response.result, specialCoordinate: response.specialCoordinate };
+  }, 'fetchGetDistanceToElementByText');
+}
+
+async function fetchGetDistanceToBottom() {
+  return await executeWithRetry(async () => {
+    console.log('fetchGetDistanceToBottom');
+    if (!(await waitForLoad())) {
+      return;
+    };
+    let tab = await getActiveTab();
+
+    let response = await chrome.tabs.sendMessage(tab.id, { action: actions.getDistanceToBottom });
+    console.log('fetchGetDistanceToBottom result: ' + response.result);
+    return { distance: response.result };
+  }, 'fetchGetDistanceToBottom');
+}
