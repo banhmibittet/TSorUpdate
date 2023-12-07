@@ -1,0 +1,892 @@
+async function logMail() {
+  return await executeWithRetry(async () => {
+    let count = 0;
+    while (true) {
+      await fetchNavigate('https://accounts.google.com/ServiceLogin?hl=en&passive=true&continue=https://www.google.com/&ec=GAZAmgQ', true);
+
+      console.log('logMail');
+      if (await fetchFindElement('[href*="accounts.google.com/SignOutOptions"]')) {
+        console.log('mail logged');
+        return true;
+      }
+      console.log('mail not logged');
+      console.log('send id : ' + profile.ID);
+      await fetchSendTextReal('#identifierId', profile.ID);
+      if (
+        (await fetchClickReal('#identifierNext > div > button', 1)) ||
+        (await fetchClickReal(`[data-email='${profile.ID}']`, 1))
+      ) {
+        console.log('send pass : ' + profile.Pass);
+        await fetchSendTextReal('#password > div:nth-child(1) > div > div:nth-child(1) > input', profile.Pass);
+        await fetchClickReal('#passwordNext > div > button');
+        await delay(5000);
+
+        console.log('Try another way');
+        await fetchClickByTextReal('button', 'Try another way');
+
+        if ((await fetchClickByTextReal('div', 'Confirm your recovery email',))) {
+          console.log('Confirm your recovery email : ' + profile.Recovery);
+          await fetchSendTextReal('input[aria-label="Enter recovery email address"]', profile.Recovery, 30000);
+          await fetchClickByTextReal('span', 'Next');
+        } else if ((await fetchClickByTextReal('div', 'Confirm your recovery phone number', 1000))) {
+          console.log('Confirm your recovery phone number : ' + profile.Recovery);
+          await fetchSendTextReal('#phoneNumberId', profile.Recovery, 30000);
+          await fetchClickByTextReal('span', 'Next');
+        } else if ((await fetchClickReal('div:contains("Get a verification code from the")', 1000))) {
+          console.log('Get a verification code from the : ' + profile.Recovery);
+          let PIN2FA = await fetchOtp(profile.Recovery);
+          await fetchSendTextReal('input[aria-label="Enter code"]', PIN2FA, 30000);
+          await fetchClickByTextReal('span', 'Next');
+        }
+
+        await fetchClickReal('#confirm');
+        await fetchClickReal('body > div:nth-child(1) > div:nth-child(2) > div:nth-child(2) > form > span > input:nth-child(9)', 5000);
+        await fetchClickByTextReal('span', 'Not now');
+      }
+      count++;
+      if (count > 1) {
+        console.log('logMail false');
+        return false;
+      }
+    }
+  }, 'logMail');
+}
+
+async function checkLanguage() {
+  return await executeWithRetry(async () => {
+    while (true) {
+      await fetchNavigate('https://myaccount.google.com/personal-info?hl=en', true);
+
+      console.log('checkLanguage');
+
+      await fetchClickReal('[role="button"][aria-label="Back"]', 5000);
+      if ((await fetchFindElementByText('div', 'English (United States)', 2000))) {
+        return true;
+      }
+      await fetchClickReal('a[aria-label="Language"]');
+      //await simulateClickByText('*','Select a language',1);
+      await fetchClickReal('button[aria-label*="Edit language"]');
+      if (!(await fetchClickReal('li[aria-label="English"]', 5))) {
+        await fetchSendTextReal('input[aria-label*="Enter language"]', 'English');
+        await fetchClickByTextReal('span', 'English');
+        await fetchClickReal('li[aria-label="United States"]', null, '.k1a2c');
+        await fetchClickReal('button[aria-label="Select your language"]:nth-child(2)', 2000);
+        await fetchClickReal('button[aria-label="Select your language"]', 2000);
+        await fetchClickReal('button[aria-label="Save your language selection"]', 2000);
+      }
+    }
+  }, 'checkLanguage');
+}
+
+function getNews() {
+  let countries = ["vietnam", "america", "german", "japan", "canada", "china", "russia", "singapore", "latest", "game", "sports", "song"];
+  let keyword = `${randomPickInArray(countries)} news`;
+  return keyword;
+}
+
+function getHowto() {
+  let verbs = ["live", "play", "draw", "ask", "listen", "hear", "sleep", "run", "jogging", "jump", "swim", "shoot", "look", "stare", "dodge", "write", "cook", "code", "sing", "study", "speak", "build", "eat", "edit", "walk", "dance", "plan", "laugh"];
+  let adverbs = ["calm", "better", "good", "well", "clean", "careful", "nicely", "rapidly", "rapid", "easily", "easy", "daily", "peaceful"];
+  let plus = ["with", "without"];
+  let nouns = ["dog", "my dog", "friend", "my friend", "family", "my family", "our family", "our friend", "our dog", "cat", "our cat", "my cat"];
+
+  let verb = randomPickInArray(verbs);
+  let adverb = randomPickInArray(adverbs);
+  let plusWord = randomPickInArray(plus);
+  let noun = randomPickInArray(nouns);
+
+  let keyword = `how to ${verb} ${adverb} ${plusWord} ${noun}`;
+  return keyword;
+}
+
+async function getCPC() {
+  let fetchedCampaign = await fetchCampaign();
+  if (fetchedCampaign) {
+    let cpcList = fetchedCampaign.CPCPool.split('\n').map(item => item.trim());
+    let keyword = randomPickInArray(cpcList);
+    return keyword;
+  }
+}
+
+// Define an array of functions to randomly choose from
+let viewFunctions = [getNews, getHowto, getCPC];
+
+async function randomAction() {
+  // Create a copy of the viewFunctions array to work with
+  let availableActions = viewFunctions.slice();
+  let loop = random(1, 2);
+  for (let index = 0; index < loop; index++) {
+
+    console.log('randomAction');
+    if (availableActions.length === 0) {
+      break; // No more actions available, exit the loop
+    }
+
+    // Randomly select an action from the available actions
+    let randomViewFunction;
+    let keyword = null;
+    while (keyword === null) {
+      randomViewFunction = randomPickInArray(availableActions);
+      keyword = await randomViewFunction();
+    }
+
+    // Remove the selected action from the availableActions array
+    let actionIndex = availableActions.indexOf(randomViewFunction);
+    if (actionIndex !== -1) {
+      availableActions.splice(actionIndex, 1);
+    }
+
+    try {
+      // Search News Post
+      await searchPost(keyword);
+
+      // Choose Post
+      if (await choosePost()) {
+        // Read Post
+        await readPost();
+      }
+    } catch (error) {
+      // Do nothing
+    }
+  }
+}
+
+async function searchPost(keyword) {
+
+
+  await updateActiveTabUrl('https://www.google.com/?hl=en');
+
+  console.log('search post');
+
+  await fetchClickReal('#L2AGLb'); // click accept policy in some country
+  if (await fetchQuickScanElement('[aria-label="Stay signed out"]')) {
+    await fetchClickReal('[aria-label="Stay signed out"]');
+  }
+  if (await fetchQuickScanElement('[aria-label="No, thanks"]')) {
+    await fetchClickReal('[aria-label="No, thanks"]');
+  }
+
+  await fetchSendTextReal('textarea.gLFyf', keyword);
+  await fetchClickReal('.gNO89b');
+}
+
+async function choosePost() {
+
+  console.log('choose post');
+
+  return await fetchClickRandomReal('[class*="LC20lb MBeuO DKV0Md"]');
+}
+
+async function readPost() {
+  console.log('read post');
+  if (!(await waitForLoad())) {
+    console.log('read post fail');
+    return;
+  }
+  console.log('read post true');
+  let watchTime = 0;
+  let duration = random(3, 5);
+  while (watchTime < duration) {
+    let lastInteractionTime = Date.now();
+    await delayScroll();
+    watchTime += (Date.now() - lastInteractionTime) / 60000;
+  }
+}
+
+async function viewWeb() {
+  console.log('viewWeb');
+  let fetchedCampaign = await fetchCampaign();
+
+  await updateActiveTabUrl('https://www.google.com/?hl=en');
+
+  let isSearchGoogle = true;
+  let result = await searchWeb(isSearchGoogle);
+  while (!result) {
+    result = await searchWeb(isSearchGoogle);
+    await delay(1000);
+  }
+  isSearchGoogle = false;
+
+  let isViewAds = fetchedCampaign.isViewAds;
+
+  let from = fetchedCampaign.DurationFrom;
+  let to = fetchedCampaign.DurationTo;
+  let duration = random(from, to);
+
+  let changeClipFrom = fetchedCampaign.ChangeClipFrom;
+  let changeClipTo = fetchedCampaign.ChangeClipTo;
+  let randomChangeTime = random(changeClipFrom, changeClipTo);
+
+  let watchTime = 0;
+  let changePostCount = 0;
+  let changePostCountMax = random(1, 3);
+  let isFindAds;
+
+  while (watchTime < duration) {
+    console.log(watchTime);
+    let lastInteractionTime = Date.now();
+
+    await checkAcceptCookies();
+
+    if (watchTime > randomChangeTime) {
+      if (changePostCount > changePostCountMax) {
+        isSearchGoogle = true;
+        changePostCountMax = random(1, 3);
+      }
+
+      if (isViewAds && changePostCount == changePostCountMax) {
+        isFindAds = true;
+      }
+
+      let result = await searchWeb(isSearchGoogle, isFindAds);
+      while (!result) {
+        if (!isSearchGoogle) {
+          let currentUrl = await fetchGetCurrentUrl();
+          if (currentUrl.includes("www.google.com")) {
+            isSearchGoogle = true;
+            changePostCountMax = random(1, 3);
+          }
+        }
+        result = await searchWeb(isSearchGoogle, isFindAds);
+        await delay(1000);
+      }
+      randomChangeTime += random(changeClipFrom, changeClipTo);
+
+      if (isFindAds) {
+        isFindAds = false;
+        // TODO - check multiple page
+      }
+
+      if (isSearchGoogle) {
+        changePostCount = 0;
+        isSearchGoogle = false;
+      } else {
+        changePostCount++;
+      }
+    }
+
+    await delayScroll();
+
+    watchTime += (Date.now() - lastInteractionTime) / 60000;
+  }
+}
+
+async function checkAcceptCookies() {
+  try {
+    console.log('checkAcceptCookies');
+    if (await fetchQuickScanElement('.cky-notice-btn-wrapper > [aria-label="Accept All"]')) {
+      await fetchClickReal('.cky-notice-btn-wrapper > [aria-label="Accept All"]');
+    }
+  } catch (error) {
+    console.error('checkAcceptCookies failed: ' + error);
+  }
+}
+
+async function checkPreciseLocation() {
+  try {
+    console.log('checkPreciseLocation');
+    if (await fetchQuickScanElementByText('span', 'See results closer to you?')) {
+      await fetchClickByTextReal('*', 'recise location');
+      await fetchClickByTextReal('div.GZ2dib.sjVJQd', 'Continue');
+    }
+  } catch (error) {
+    console.error('checkPreciseLocation failed: ' + error);
+  }
+}
+
+async function checkStaySignOut() {
+  try {
+    console.log('checkStaySignOut');
+    if (await fetchQuickScanElementByText('span', 'Stay signed out')) {
+      await fetchClickByTextReal('span', 'Stay signed out');
+    }
+  } catch (error) {
+    console.error('checkStaySignOut failed: ' + error);
+  }
+}
+
+async function searchWeb(isSearchGoogle, isFindAds = false) {
+  let fetchedCampaign = await fetchCampaign();
+
+  try {
+    if (isFindAds) {
+      // TODO - click shadow ads
+    }
+
+    let socialPercent = fetchedCampaign.SocialPercent;
+    let shortPercent = fetchedCampaign.ShortPercent;
+    let suggestPercent = fetchedCampaign.SuggestPercent;
+    let percentFluctuation = fetchedCampaign.PercentFluctuation;
+    let webList = fetchedCampaign.WebPool.split('\n').map(item => item.trim());
+    let socialList = fetchedCampaign.SocialPool.split('\n').map(item => item.trim());
+    let shopList = fetchedCampaign.ShopPool.split('\n').map(item => item.trim());
+    let shortList = fetchedCampaign.ShortPool.split('\n').map(item => item.trim());
+
+    let web = randomPickInArray(webList);
+    let [webName, postName, link] = web.split(';').map((item) => item.trim());
+
+    if (!isSearchGoogle) {
+      let currentUrl = await fetchGetCurrentUrl();
+      currentUrl = currentUrl.match(/(?<=https:\/\/).*?(?=\/)/)[0];
+      // Check if currentUrl is present in socialList, shopList, or shortList
+      if (socialList.some(url => url.includes(currentUrl)) ||
+        shopList.some(url => url.includes(currentUrl)) ||
+        shortList.some(url => url.includes(currentUrl))) {
+        // Do nothing if currentUrl is present in any list
+        await fetchNavigate(link, true);
+        return link;
+      } else {
+        webList = webList.filter(x => x.includes(currentUrl));
+      }
+    }
+
+    web = randomPickInArray(webList);
+    [webName, postName, link] = web.split(';').map((item) => item.trim());
+
+    let nameArray = postName.split(' ');
+    let startIndex = 0;
+    let endIndex = random(nameArray.length / 4, nameArray.length / 3);
+    let nameModified = nameArray.slice(startIndex, endIndex).join(' ');
+    let keyword = webName + ' ' + postName;
+
+    // Search post in same page
+    if (!isSearchGoogle) {
+      console.log("searchWeb_SearchPostInSamePage");
+      let clss = await checkWebPostElement();
+      let actionIndex = [];
+      if (await fetchQuickScanElement('[class*="wp-block-search__input"]')) {
+        actionIndex.push(0);
+      }
+      if (await fetchQuickScanElement('.ramdom-post a')) {
+        actionIndex.push(1);
+      }
+      if (clss && (await fetchQuickScanElement(`${clss} a`))) {
+        actionIndex.push(2);
+      }
+      if (await fetchQuickScanElement('.fa.fa-search')) {
+        actionIndex.push(3);
+      }
+      if (await fetchQuickScanElement('.display-random-post a')) {
+        actionIndex.push(4);
+      }
+      if (await fetchQuickScanElement('.spnc-toggle')) {
+        actionIndex.push(5);
+      }
+
+      if (actionIndex.length > 0) {
+        switch (randomPickInArray(actionIndex)) {
+          case 0:
+            // Search post in same page
+            await fetchSendTextReal('.wp-block-search__input', nameModified);
+            await fetchClickReal('.wp-block-search__button.wp-element-button');
+            // Scan post after search
+            clss = await checkWebPostElement();
+
+            //await fetchClickRandom(`${clss} a`);
+            await fetchClickRandomReal(`${clss} a`);
+            break;
+          case 1:
+            await fetchClickReal('.ramdom-post a'); // Click random post button
+            break;
+          case 2:
+            // Scan suggest post after read
+            clss = await checkWebPostElement();
+
+            //await fetchClickRandom(`${clss} a`);
+            await fetchClickRandomReal(`${clss} a`);
+            break;
+          case 3:
+            // Search post in same page
+            await fetchClickReal('.fa.fa-search'); // Click to show hidden search box
+
+            await fetchSendTextReal('[type="search"]', nameModified);
+            await fetchClickReal('[type="submit"].search');
+            // Scan post after search
+            clss = await checkWebPostElement();
+
+            //await fetchClickRandom(`${clss} a`);
+            await fetchClickRandomReal(`${clss} a`);
+            break;
+          case 4:
+            await fetchClickReal('.display-random-post a'); // Click random post button
+            break;
+          case 5:
+            // Search post in same page
+            if (await fetchQuickScanElement('.collapse.spnc-collapse')) {
+              await fetchClickReal('.spnc-toggle'); // Click to show hidden search box
+            }
+            await fetchClickReal('.search-icon'); // Click to show hidden search box
+            await fetchSendTextReal('.search-field', nameModified);
+            await fetchClickReal('.search-submit.btn');
+            // Scan post after search
+            clss = await checkWebPostElement();
+
+            //await fetchClickRandom(`${clss} a`);
+            await fetchClickRandomReal(`${clss} a`);
+            break;
+          default:
+            break;
+        }
+        console.log('Same page');
+        return link;
+      }
+    }
+
+    // Search google
+    console.log("searchWeb_SearchGoogle");
+    await searchPost(keyword);
+    let hrefs = await fetchGetHrefElements('[jsname*="UWckNb"]'); // get href of visible posts
+    hrefs = MinusMainPage(hrefs);
+    // Scan all visible post which exist in the pool
+    let browseList = webList.filter(webItem => {
+      // Check if webItem contains any of the hrefs
+      return hrefs.some(href => webItem.includes(href));
+    });
+
+    if (browseList.length > 0) {
+      while (true) {
+        console.log("searchWeb_ClickAfterSearch");
+        await checkStaySignOut();
+        await checkPreciseLocation();
+        web = randomPickInArray(browseList);
+        [webName, postName, link] = web.split(';').map((item) => item.trim());
+        await fetchClickReal(`[jsname="UWckNb"][href*="${link}"] > h3`);
+
+        let currentUrl = await fetchGetCurrentUrl();
+        if (!currentUrl.includes("www.google.com")) {
+          console.log('Search');
+          return link;
+        }
+      }
+    }
+    // Navigate reference if not found search
+    let isNavigateReference = randomRoll() < clamp(random(suggestPercent - percentFluctuation, suggestPercent + percentFluctuation), 0, 100);
+    if (isNavigateReference) {
+      console.log("searchWeb_NavigateReference");
+      let subLink = randomPickInArray(socialList);
+
+      let percentRandomSocial = clamp(random(socialPercent - percentFluctuation, socialPercent + percentFluctuation), 0, 100);
+      let percentRandomShort = clamp(random(shortPercent - percentFluctuation, shortPercent + percentFluctuation), 0, 100);
+      percentRandomShort = clamp(percentRandomSocial + percentRandomShort, 0, 100);
+      let randomResult = randomRoll();
+      if (randomResult <= percentRandomSocial) {
+        subLink = randomPickInArray(socialList).trim();
+        console.log('Social');
+      } else if (randomResult > percentRandomSocial && randomResult <= percentRandomShort) {
+        subLink = randomPickInArray(shortList).trim();
+        console.log('Short');
+      } else {
+        subLink = randomPickInArray(shopList).trim();
+        console.log('Shop');
+      }
+
+      await fetchNavigate(subLink, true);
+      await fetchNavigate(link, true);
+      return link;
+    }
+  } catch (error) {
+    //console.error('An error occurred:' + error);
+  }
+  return null;
+}
+
+function MinusMainPage(urlArray) {
+
+  // Create the urlsToRemove array by extracting unique domains and mapping to full URLs
+  let urlsToRemove = [...new Set(urlArray.map(url => new URL(url).hostname))]
+    .map(domain => `https://${domain}/`);
+
+  // Use the filter method to create a new array with URLs not in the urlsToRemove array
+  let filteredUrls = urlArray.filter(url => !urlsToRemove.includes(url));
+
+  return filteredUrls;
+}
+
+async function viewYoutube() {
+  console.log('viewYoutube');
+  let fetchedCampaign = await fetchCampaign();
+  let youtubeList = fetchedCampaign.YoutubePool.split('\n').map(item => item.trim());
+  let isLike = fetchedCampaign.isLike;
+  let isComment = fetchedCampaign.isComment;
+  let commentPool = fetchedCampaign.CommentPool.split('\n').map(item => item.trim());
+  let likePercent = fetchedCampaign.LikePercent;
+  let commentPercent = fetchedCampaign.CommentPercent;
+  let isSubTab = fetchedCampaign.isSubTab;
+
+
+  await updateActiveTabUrl('https://www.youtube.com/?hl=en');
+
+  await changeVideo();
+
+  if (isSubTab) {
+    await subTabInit();
+  }
+
+  let from = fetchedCampaign.DurationFrom;
+  let to = fetchedCampaign.DurationTo;
+  let duration = random(from, to);
+
+  let changeClipFrom = fetchedCampaign.ChangeClipFrom;
+  let changeClipTo = fetchedCampaign.ChangeClipTo;
+  let randomChangeTime = random(changeClipFrom, changeClipTo);
+
+  let watchTime = 0;
+
+  while (watchTime < duration) {
+    console.log(watchTime);
+    let lastInteractionTime = Date.now();
+
+    if (!(await checkVideoAvailable()) || !(await checkVideoOnPool(youtubeList))) {
+      await delay(15000);
+      await changeVideo();
+    } else {
+      await checkAds();
+      await checkPause();
+      await checkAudio();
+      await checkAutoPlay();
+      await checkMicrophone();
+    }
+
+    if (watchTime > randomChangeTime) {
+      if (isLike && randomRoll() < likePercent) {
+        await checkLike();
+      }
+
+      if (isComment && randomRoll() < commentPercent) {
+        await commentOnVideo(commentPool);
+      }
+
+      await changeVideo();
+
+      if (isSubTab) {
+        await subTabInteraction();
+      }
+
+      randomChangeTime += random(changeClipFrom, changeClipTo);
+    }
+
+    await delayScrollForVideo();
+
+    watchTime += (Date.now() - lastInteractionTime) / 60000;
+  }
+}
+
+async function subTabInit() {
+  await switchActiveToTab(subTab);
+
+  await updateActiveTabUrl('https://www.youtube.com/?hl=en');
+
+  await subTabChangeVideo();
+
+  await switchActiveToTab(mainTab);
+}
+
+async function subTabInteraction() {
+  await switchActiveToTab(subTab);
+
+  await checkAds();
+  await checkPause();
+  await checkAudio();
+
+  await switchActiveToTab(mainTab);
+}
+
+async function commentOnVideo(commentPool) {
+
+  let data = await fetchGetDistanceToBottom();
+  await fetchScrollReal(data.distance);
+
+  let comment = randomPickInArray(commentPool);
+  if (await fetchSendTextReal('[role="textbox"]', 'Add a comment', comment)) {
+    await fetchClickReal('button[aria-label="Comment"]');
+  }
+}
+
+async function changeVideo() {
+  console.log('changeVideo');
+  let result;
+  do {
+    result = await searchYoutube();
+    await delay(5000);
+  } while (!result);
+
+  await checkAds();
+  await checkPause();
+  await checkAudio();
+  await checkAutoPlay();
+}
+
+async function subTabChangeVideo() {
+  console.log('subTabChangeVideo');
+  let result;
+  do {
+    result = await subTabSearchYoutube();
+    await delay(5000);
+  } while (!result);
+
+  await checkAds();
+  await checkPause();
+  await checkAudio();
+  await checkAutoPlay();
+  await checkLike();
+  await checkSubscribe();
+}
+
+async function checkPause() {
+  try {
+    console.log('checkPause');
+    if (await fetchQuickScanElementByText('yt-formatted-string', 'Video paused. Continue watching?')) {
+      await fetchClickReal('button[aria-label="Yes"]');
+    }
+    if (await fetchQuickScanElement('button[title="Play (k)"]')) {
+      await fetchClickReal('button[title="Play (k)"]');
+    }
+  } catch (error) {
+    console.error('checkPause failed: ' + error);
+  }
+}
+
+async function checkAudio() {
+  try {
+    console.log('checkAudio');
+    if (await fetchQuickScanElement('button[title="Unmute (m)"]')) {
+      await fetchClickReal('button[title="Unmute (m)');
+    }
+  } catch (error) {
+    console.error('checkAudio failed: ' + error);
+  }
+}
+
+async function checkAutoPlay() {
+  try {
+    console.log('checkAutoPlay');
+    if (await fetchQuickScanElement('button[title="Autoplay is off"]')) {
+      await fetchClickReal('button[title="Autoplay is off');
+    }
+  } catch (error) {
+    console.error('checkAutoPlay failed: ' + error);
+  }
+}
+
+async function checkMicrophone() {
+  try {
+    console.log('checkMicrophone');
+    if (await fetchQuickScanElementByText('#prompt', 'Search with your voice')) {
+      await fetchClickReal('button[aria-label="Cancel"]');
+    }
+  } catch (error) {
+    console.error('checkMicrophone failed: ' + error);
+  }
+}
+
+async function checkSubscribe() {
+  try {
+    console.log('checkSubscribe');
+    if (await fetchQuickScanElement('button[aria-label*="Subscribe to"]')) {
+      await fetchClickReal('button[aria-label*="Subscribe to"]');
+    }
+  } catch (error) {
+    console.error('checkSubscribe failed: ' + error);
+  }
+}
+
+async function checkLike() {
+  try {
+    console.log('checkLike');
+    if (await fetchQuickScanElement('button[aria-label*="like this video along with"]')) {
+      await fetchClickReal('button[aria-label*="like this video along with"]');
+    }
+  } catch (error) {
+    console.error('checkLike failed: ' + error);
+  }
+}
+
+async function checkAds() {
+  try {
+    console.log('checkAds');
+    if (await fetchQuickScanElementByText('*', 'Skip Ad')) {
+      await fetchClickByTextReal('*', 'Skip Ad');
+    }
+    if (await fetchQuickScanElementByText('*', 'Skip Ads')) {
+      await fetchClickByTextReal('*', 'Skip Ads');
+    }
+  } catch (error) {
+    console.error('checkAds failed: ' + error);
+  }
+}
+
+async function checkVideoAvailable() {
+  try {
+    console.log('checkVideoAvailable');
+    if (await fetchQuickScanElementByText('*', 'Video unavailable')) {
+      console.log('Video unavailable');
+      return false;
+    }
+    if (await fetchQuickScanElementByText('*', 'This video is private')) {
+      console.log('This video is private');
+      return false;
+    }
+    if (await fetchQuickScanElementByText('*', 'This is a private video')) {
+      console.log('This is a private video');
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('checkVideoAvailable failed: ' + error);
+  }
+}
+
+async function checkVideoOnPool(youtubeList) {
+  try {
+    console.log('checkVideoOnPool');
+    let currentUrl = await fetchGetCurrentUrl();
+    const videoLinkID = currentUrl.split("/watch?v=")[1].split('&')[0];
+    return youtubeList.some(item => item.includes(videoLinkID));
+  } catch (error) {
+    console.error('checkVideoOnPool failed: ' + error);
+  }
+}
+
+async function searchYoutube() {
+  let fetchedCampaign = await fetchCampaign();
+
+  try {
+
+    let suggestPercent = fetchedCampaign.SuggestPercent;
+
+    let percentFluctuation = fetchedCampaign.PercentFluctuation;
+
+    let youtubeList = fetchedCampaign.YoutubePool.split('\n').map(item => item.trim());
+
+    let youtube = randomPickInArray(youtubeList);
+    let [channelName, videoName, link] = youtube.split(';').map((item) => item.trim());
+
+    let nameArray = videoName.split(' ');
+    let startIndex = 0;
+    let endIndex = random(nameArray.length / 2, nameArray.length);
+    let nameModified = nameArray.slice(startIndex, endIndex).join(' ');
+    let keyword = channelName + ' ' + nameModified;
+    if (randomRoll() < 30) {
+      keyword = nameModified;
+    }
+
+    // Find suggest video in pool
+    let isSuggest = randomRoll() < clamp(random(suggestPercent - percentFluctuation, suggestPercent + percentFluctuation), 0, 100);
+    if (isSuggest) {
+      let result = await scanVisibleVideo('[id*="thumbnail"][href*="/watch"]', youtubeList);
+      if (result) {
+        return result;
+      }
+    }
+
+    // Search video
+    await fetchClickReal('.yt-icon-button.style-scope[aria-label="Search"]');
+    await fetchClickReal('.yt-spec-button-shape-next.yt-spec-button-shape-next--text.yt-spec-button-shape-next--mono.yt-spec-button-shape-next--size-m.yt-spec-button-shape-next--icon-only-default[aria-label="Clear search query"]');
+    if (await fetchSendTextReal('input#search', keyword)) {
+      await fetchClickReal('.style-scope.ytd-searchbox[aria-label="Search"]');
+
+      let result = await scanVisibleVideo('[id*="thumbnail"][href*="/watch"]', youtubeList);
+      if (result) {
+        return result;
+      }
+    }
+
+    // Navigate if nothing found
+    await fetchNavigate(link, true);
+    return link;
+
+  } catch (error) {
+    //console.error('An error occurred:' + error);
+  }
+  return null;
+}
+
+async function subTabSearchYoutube() {
+  let fetchedCampaign = await fetchCampaign();
+
+  try {
+    let subTabYoutubeList = fetchedCampaign.SubTabYoutubePool.split('\n').map(item => item.trim());
+
+    for (let index = 0; index < subTabYoutubeList.length; index++) {
+      let youtube = subTabYoutubeList[index];
+      let channelId = youtube.split(".com/")[1].split('/')[0];
+      if (await fetchQuickScanElement(`#dismissible:has([href*="${channelId}"]) *[id*="thumbnail"][href*="/watch"]`)) {
+        await fetchClickRandomReal(`#dismissible:has([href*="${channelId}"]) *[id*="thumbnail"][href*="/watch"]`);
+        return channelId;
+      }
+    }
+
+    let link = randomPickInArray(subTabYoutubeList);
+    await fetchNavigate(link, true);
+    if (await fetchClickRandomReal('[id*="thumbnail"][href*="/watch"]')) {
+      return link;
+    }
+  } catch (error) {
+    //console.error('An error occurred:' + error);
+  }
+  return null;
+}
+
+async function scanVisibleVideo(selector, itemList) {
+  await delay(5000);
+  let hrefs = await fetchGetHrefElements(selector); // get href of visible posts
+  // Scan all visible post which exist in the pool
+  let visibleList = itemList.filter(item => {
+    // Check if webItem contains any of the hrefs
+    return hrefs.some(href => {
+      let videoId = href.split("/watch?v=")[1].split('&')[0];
+      return item.includes(videoId);
+    });
+  });
+
+  if (visibleList.length > 0) {
+    let item = randomPickInArray(visibleList);
+    let [channelName, videoName, link] = item.split(';').map((item) => item.trim());
+    let videoId = link.split("/watch?v=")[1].split('&')[0];
+    await fetchClickReal(`[href*="${videoId}"]`);
+
+    return link;
+  }
+  return null;
+}
+
+async function delayScroll() {
+  if (randomRoll() < 20) {
+    if (randomRoll() < 70) {
+      await fetchScrollReal(random(scrollDownDistanceMin, scrollDownDistanceMax));
+    } else {
+      await fetchScrollReal(random(scrollUpDistanceMin, scrollUpDistanceMax));
+    }
+  }
+  await delay(random(10000, 20000));
+}
+
+async function delayScrollForVideo() {
+  if (randomRoll() < 5) {
+    if (randomRoll() < 30) {
+      await fetchScrollReal(random(scrollDownDistanceMin, scrollDownDistanceMax));
+    } else {
+      await fetchScrollReal(random(scrollUpDistanceMin, scrollUpDistanceMax));
+    }
+  }
+  await delay(random(10000, 20000));
+}
+
+async function checkWebPostElement() {
+  let clss;
+  if (await fetchQuickScanElement('.title.mb-20.mt-4')) {
+    clss = '.title.mb-20.mt-4';
+  } else if (await fetchQuickScanElement('.entry-title.mag-post-title')) {
+    clss = '.entry-title.mag-post-title';
+  } else if (await fetchQuickScanElement('.entry-title.entry-title-big')) {
+    clss = '.entry-title.entry-title-big';
+  } else if (await fetchQuickScanElement('.entry-title')) {
+    clss = '.entry-title';
+  } else if (await fetchQuickScanElement('.spnc-entry-title')) {
+    clss = '.spnc-entry-title';
+  } else if (await fetchQuickScanElement('.post-title')) {
+    clss = '.post-title';
+  }
+  return clss;
+}
+
