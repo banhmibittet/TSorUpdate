@@ -1,0 +1,266 @@
+function simulateFindElementByText(selector, textToFind, maxWaitTime = 10000) {
+  return new Promise((resolve) => {
+    let pollingInterval = 1000; // Polling interval in milliseconds
+    let checkElement = () => {
+      let elements = document.querySelectorAll(selector);
+      let result;
+      for (let element of elements) {
+        if (element.offsetParent !== null) {
+          // Element is visible, add it to the results
+          if (element.textContent.includes(textToFind)) {
+            result = element; // Element exists
+          }
+        }
+      }
+      //console.log(result);
+
+      if (result) {
+        resolve(result);
+      } else if (maxWaitTime <= 0) {
+        resolve(result);  // Element doesn't exist, and timeout occurred
+      } else {
+        // Continue polling
+        setTimeout(checkElement, pollingInterval);
+        maxWaitTime -= pollingInterval;
+      }
+    };
+
+    // Start the initial check
+    checkElement();
+  });
+}
+
+function simulateFindElementsByText(selector, textToFind, maxWaitTime = 10000) {
+  return new Promise((resolve) => {
+    let pollingInterval = 1000; // Polling interval in milliseconds
+    let checkElement = () => {
+      let elements = document.querySelectorAll(selector);
+      let result = [];
+      for (let element of elements) {
+        if (element.offsetParent !== null) {
+          // Element is visible, add it to the results
+          if (element.textContent.includes(textToFind)) {
+            result.push(element); // Element exists
+          }
+        }
+      }
+      //console.log(result);
+
+      if (result) {
+        resolve(result);
+      } else if (maxWaitTime <= 0) {
+        resolve(result);  // Element doesn't exist, and timeout occurred
+      } else {
+        // Continue polling
+        setTimeout(checkElement, pollingInterval);
+        maxWaitTime -= pollingInterval;
+      }
+    };
+
+    // Start the initial check
+    checkElement();
+  });
+}
+
+function simulateFindElement(selector, maxWaitTime = 10000) {
+  return new Promise((resolve) => {
+    let pollingInterval = 1000; // Polling interval in milliseconds
+
+    let checkElement = () => {
+      let elements = document.querySelectorAll(selector);
+      let result;
+      for (let element of elements) {
+        if (element.offsetParent !== null) {
+          // Element is visible, add it to the results
+          result = element;
+        }
+      }
+      //console.log(result);
+      if (result) {
+        resolve(result); // Element exists
+      } else if (maxWaitTime <= 0) {
+        resolve(result); // Element doesn't exist, and timeout occurred
+      } else {
+        // Continue polling
+        setTimeout(checkElement, pollingInterval);
+        maxWaitTime -= pollingInterval;
+      }
+    };
+
+    // Start the initial check
+    checkElement();
+  });
+}
+
+function simulateFindElements(selector, maxWaitTime = 10000) {
+  return new Promise((resolve) => {
+    let pollingInterval = 1000; // Polling interval in milliseconds
+
+    let checkElement = () => {
+      let elements = document.querySelectorAll(selector);
+      let result = [];
+      for (let element of elements) {
+        if (element.offsetParent !== null) {
+          // Element is visible, add it to the results
+          result.push(element);
+        }
+      }
+      //console.log(result);
+      if (result) {
+        resolve(result); // Element exists
+      } else if (maxWaitTime <= 0) {
+        resolve(result); // Element doesn't exist, and timeout occurred
+      } else {
+        // Continue polling
+        setTimeout(checkElement, pollingInterval);
+        maxWaitTime -= pollingInterval;
+      }
+    };
+
+    // Start the initial check
+    checkElement();
+  });
+}
+
+function simualteNavigate(url, isHref) {
+  if (isHref) {
+    window.location.href = url;
+  } else {
+    window.location.assign(url);
+  }
+}
+
+async function simulateGetElementPositionOnScreen(selector, maxWaitTime = 10000) {
+  let elementToInteract = await simulateFindElement(selector, maxWaitTime);
+  if (elementToInteract) {
+    // Get the height of the entire browser window
+    let windowHeight = window.outerHeight;
+
+    // Get the height of the viewport (the visible area)
+    let viewportHeight = window.innerHeight;
+
+    // Calculate the height of the window header
+    let windowHeaderHeight = windowHeight - viewportHeight;
+
+    // Button bounds relative to viewport  
+    let elementRect = elementToInteract.getBoundingClientRect();
+
+    // Calculate the padding as a fraction of the element's dimensions
+    const paddingFraction = 0.4; // Adjust this value as needed (0.1 represents 10% padding)
+
+    // Calculate the padding based on the element's size
+    const paddingX = elementRect.width * paddingFraction;
+    const paddingY = elementRect.height * paddingFraction;
+
+    // Choose a random destination position within the element
+    let screenX = window.screenX + elementRect.left + paddingX + Math.random() * (elementRect.width - 2 * paddingX);
+    let screenY = window.screenY + elementRect.top + windowHeaderHeight + paddingY + Math.random() * (elementRect.height - 2 * paddingY);
+
+    screenX = clamp(screenX, 0, 1920);
+    screenY = clamp(screenY, 0, 1080);
+    // Return the position as an object
+    return { screenX, screenY };
+  } else {
+    return false;
+  }
+}
+
+async function simulateGetElementPositionOnScreenByElement(elementToInteract) {
+  // Get the height of the entire browser window
+  let windowHeight = window.outerHeight;
+
+  // Get the height of the viewport (the visible area)
+  let viewportHeight = window.innerHeight;
+
+  // Calculate the height of the window header
+  let windowHeaderHeight = windowHeight - viewportHeight;
+
+  // Button bounds relative to viewport  
+  let elementRect = elementToInteract.getBoundingClientRect();
+
+  // Calculate the padding as a fraction of the element's dimensions
+  const paddingFraction = 0.4; // Adjust this value as needed (0.1 represents 10% padding)
+
+  // Calculate the padding based on the element's size
+  const paddingX = elementRect.width * paddingFraction;
+  const paddingY = elementRect.height * paddingFraction;
+
+  // Choose a random destination position within the element
+  let screenX = window.screenX + elementRect.left + paddingX + Math.random() * (elementRect.width - 2 * paddingX);
+  let screenY = window.screenY + elementRect.top + windowHeaderHeight + paddingY + Math.random() * (elementRect.height - 2 * paddingY);
+
+  screenX = clamp(screenX, 0, 1920);
+  screenY = clamp(screenY, 0, 1080);
+  // Return the position as an object
+  return { screenX, screenY };
+}
+
+async function simulateGetPositionOnScreen() {
+  // Get the height of the entire browser window
+  let windowHeight = window.outerHeight;
+
+  // Get the height of the viewport (the visible area)
+  let viewportHeight = window.innerHeight;
+
+  // Calculate the height of the window header
+  let windowHeaderHeight = windowHeight - viewportHeight;
+
+  // Calculate the padding as a fraction of the element's dimensions
+  const paddingFraction = 0.3; // Adjust this value as needed (0.1 represents 10% padding)
+
+  // Calculate the padding based on the element's size
+  const paddingX = window.innerWidth * paddingFraction;
+  const paddingY = window.innerHeight * paddingFraction;
+
+  // Choose a random destination position within the element
+  let screenX = window.screenX + paddingX + Math.random() * (window.innerWidth - 2 * paddingX);
+  let screenY = window.screenY + windowHeaderHeight + paddingY + Math.random() * (window.innerHeight - 2 * paddingY);
+
+  screenX = clamp(screenX, 0, 1920);
+  screenY = clamp(screenY, 0, 1080);
+  // Return the position as an object
+  return { screenX, screenY };
+}
+
+function simulateIsElementVisibleByElement(elementToInteract, specialContainer = null) {
+  let elementRect = elementToInteract.getBoundingClientRect();
+  let height = window.document.documentElement.clientHeight; // viewport content area with scrollbars subtracted
+  let width = window.document.documentElement.clientWidth; // viewport content area with scrollbars subtracted
+
+  if (specialContainer) {
+    let containerRect = specialContainer.getBoundingClientRect();
+    return (
+      elementRect.top >= containerRect.top &&
+      elementRect.left >= containerRect.left &&
+      elementRect.bottom <= containerRect.bottom &&
+      elementRect.right <= containerRect.right
+    );
+  }
+  return (
+    elementRect.top >= 0 &&
+    elementRect.left >= 0 &&
+    elementRect.bottom <= height &&
+    elementRect.right <= width
+  );
+}
+
+async function simulateGetDistanceToElement(elementToInteract, specialContainer = null) {
+  // Now simulateScroll the target element into view
+  let elementRect = elementToInteract.getBoundingClientRect();
+
+  let viewportCenterMin = window.innerHeight / 4;
+  let viewportCenterMax = window.innerHeight / 4 * 3;
+  let viewportCenter = random(viewportCenterMin, viewportCenterMax);
+  let scrollDistance = elementRect.top - viewportCenter + elementRect.height / 2;
+
+  if (specialContainer) {
+    let specialContainerRect = specialContainer.getBoundingClientRect();
+    viewportCenterMin = specialContainerRect.height / 4;
+    viewportCenterMax = specialContainerRect.height / 4 * 3;
+    viewportCenter = random(viewportCenterMin, viewportCenterMax);
+    scrollDistance = elementRect.top - specialContainerRect.top - viewportCenter + elementRect.height / 2;
+  }
+
+  return scrollDistance;
+  //await simulateScroll(scrollDistance, specialContainer);
+}
