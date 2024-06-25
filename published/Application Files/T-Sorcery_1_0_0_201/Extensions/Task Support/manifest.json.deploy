@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Node-API",
+  "version": "1.0",
+  "description": "Fetching database",
+  "permissions": [
+    "activeTab",
+	  "scripting",
+    "storage",
+    "tabs",
+    "webRequest",
+    "notifications",
+    "clipboardRead",
+    "clipboardWrite",
+    "webNavigation",
+    "offscreen"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "profile.js",
+        "supportContent.js",
+        "simulate.js",
+        "action.js",
+        "content.js"
+      ]
+    }
+  ]
+}

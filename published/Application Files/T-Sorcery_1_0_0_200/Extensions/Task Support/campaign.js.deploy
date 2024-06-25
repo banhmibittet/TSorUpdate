@@ -1,0 +1,35 @@
+// create simple struct for easy calling field.
+let campaign = {
+    YoutubePool: "", // String
+    ChangeClipFrom: 0, // Number
+    ChangeClipTo: 0, // Number
+    DurationFrom: 0, // Number
+    DurationTo: 0, // Number
+    BiliBiliPool: "", // String
+    SubFrom: 0, // Number
+    SubTo: 0, // Number
+    YoutubeSubPool: "", // String
+    CampaignID: "", // String
+    isChangeClip: false, // Boolean
+    isSendMail: false, // Boolean
+    isSub: false, // Boolean
+    isViewBili: false, // Boolean
+    isViewNews: false, // Boolean
+    isViewYoutube: false, // Boolean
+    isMobile: false, // Boolean
+    SubPercent: 0, // Number
+    MobilePercent: 0, // Number
+    isRunning: false, // Boolean
+    CPCPool: "", // String
+    SuggestPercent: 0, // Number
+    WebPool: "", // String
+    isViewWeb: false, // Boolean
+    isLogMail: false, // Boolean
+    SocialPool: "", // String
+    PercentFluctuation: 0, // Number
+    ShopPool: "", // String
+    ShortPool: "", // String
+    SocialPercent: 0, // Number
+    ShortPercent: 0, // Number
+    isViewAds: false, // Boolean
+};
