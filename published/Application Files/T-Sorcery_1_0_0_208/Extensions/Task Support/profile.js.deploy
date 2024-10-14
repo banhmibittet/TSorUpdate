@@ -1,0 +1,11 @@
+let profile = {
+    STT: 0,
+    ProfileName: '',
+    ID: '',
+    Pass: '',
+    Recovery: '',
+    Extra: '',
+    IP: '',
+    Log: '',
+    HistoryPool: ''
+};

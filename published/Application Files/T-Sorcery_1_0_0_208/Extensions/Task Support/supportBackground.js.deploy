@@ -1,0 +1,112 @@
+let eventDelayMin = 50;
+let eventDelayMax = 200;
+let moveEventDelayMin = 10;
+let moveEventDelayMax = 20;
+let wheelEventDelayMin = 200;
+let wheelEventDelayMax = 300;
+let postDelayMin = 1000;
+let postDelayMax = 2000;
+
+let scrollDownDistanceMin = 500;
+let scrollDownDistanceMax = 1500;
+let scrollUpDistanceMax = -1500;
+let scrollUpDistanceMin = -500;
+
+let actions = {
+    getCurrentUrl: 'getCurrentUrl',
+    sendLog: 'sendLog',
+    quickScanElement: 'quickScanElement',
+    quickScanElementByText: 'quickScanElementByText',
+    getHrefElements: 'getHrefElements',
+    getElementPositionOnScreen: 'getElementPositionOnScreen',
+    getElementPositionOnScreenInFrame: 'getElementPositionOnScreenInFrame',
+    getElementPositionOnScreenByText: 'getElementPositionOnScreenByText',
+    getElementPositionOnScreenByTextInFrame: 'getElementPositionOnScreenByTextInFrame',
+    getRandomVisibleElementPositionOnScreen: 'getRandomVisibleElementPositionOnScreen',
+    getPositionOnScreen: 'getPositionOnScreen',
+    findElement: 'findElement',
+    findElementInFrame: 'findElementInFrame',
+    findElementByText: 'findElementByText',
+    findElementByTextInFrame: 'findElementByTextInFrame',
+    findElements: 'findElements',
+    findElementsByText: 'findElementsByText',
+    navigate: 'navigate',
+    isElementVisible: 'isElementVisible',
+    isElementVisibleInFrame: 'isElementVisibleInFrame',
+    isElementVisibleByText: 'isElementVisibleByText',
+    isElementVisibleByTextInFrame: 'isElementVisibleByTextInFrame',
+    getDistanceToElement: 'getDistanceToElement',
+    getDistanceToElementInFrame: 'getDistanceToElementInFrame',
+    getDistanceToRandomElement: 'getDistanceToRandomElement',
+    getDistanceToElementByText: 'getDistanceToElementByText',
+    getDistanceToElementByTextInFrame: 'getDistanceToElementByTextInFrame',
+    getDistanceToBottom: 'getDistanceToBottom'
+};
+
+async function executeWithRetry(fn, functionName, delayMs = 10000) {
+    while (true) {
+        try {
+            let result = await fn();
+            return result;
+        } catch (error) {
+            console.error(`${functionName} Error: ${error}`);
+        }
+        await delay(delayMs);
+    }
+}
+
+
+async function delay(ms) {
+    let start = Date.now();
+    let elapsed = 0;
+    while (elapsed < ms) {
+        elapsed = Date.now() - start;
+        // You can use this loop for any other necessary tasks while waiting
+        console.log('delaying');
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+}
+
+function random(min, max) {
+    return Math.random() * (max - min) + min;
+}
+
+function randomRoll() {
+    // Generate a random number between 0 and 99
+    return Math.floor(Math.random() * 100);
+}
+
+function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+}
+
+function randomPickInArray(value) {
+    return value[Math.floor(Math.random() * value.length)];
+}
+
+function removeDiacritics(text) {
+
+    // Ensure text is a string
+    text = String(text);
+
+    text = text.replace(/A|Á|À|Ã|Ạ|Â|Ấ|Ầ|Ẫ|Ậ|Ă|Ắ|Ằ|Ẵ|Ặ/g, "A");
+    text = text.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
+    text = text.replace(/E|É|È|Ẽ|Ẹ|Ê|Ế|Ề|Ễ|Ệ/, "E");
+    text = text.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
+    text = text.replace(/I|Í|Ì|Ĩ|Ị/g, "I");
+    text = text.replace(/ì|í|ị|ỉ|ĩ/g, "i");
+    text = text.replace(/O|Ó|Ò|Õ|Ọ|Ô|Ố|Ồ|Ỗ|Ộ|Ơ|Ớ|Ờ|Ỡ|Ợ/g, "O");
+    text = text.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o");
+    text = text.replace(/U|Ú|Ù|Ũ|Ụ|Ư|Ứ|Ừ|Ữ|Ự/g, "U");
+    text = text.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u");
+    text = text.replace(/Y|Ý|Ỳ|Ỹ|Ỵ/g, "Y");
+    text = text.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
+    text = text.replace(/Đ/g, "D");
+    text = text.replace(/đ/g, "d");
+    // Some system encode vietnamese combining accent as individual utf-8 characters
+    text = text.replace(/\u0300|\u0301|\u0303|\u0309|\u0323/g, ""); // Huyền sắc hỏi ngã nặng 
+    text = text.replace(/\u02C6|\u0306|\u031B/g, ""); // Â, Ê, Ă, Ơ, Ư
+
+    return text;
+}
+
